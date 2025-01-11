@@ -2,13 +2,12 @@ from flask import Flask, render_template, request, send_file
 import os
 import re
 from werkzeug.utils import secure_filename
+import tempfile
 
 app = Flask(__name__)
-app.config['UPLOAD_FOLDER'] = 'uploads'
+# 使用系统临时目录
+app.config['UPLOAD_FOLDER'] = tempfile.gettempdir()
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 限制文件大小为16MB
-
-# 确保上传文件夹存在
-os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
 
 def has_chinese(text):
     """检查文本是否包含中文字符"""
@@ -17,7 +16,7 @@ def has_chinese(text):
 
 def process_file(input_path):
     """处理文件，删除包含中文的行"""
-    output_path = input_path + '_processed.txt'
+    output_path = os.path.join(tempfile.gettempdir(), 'processed_' + os.path.basename(input_path))
     
     try:
         with open(input_path, 'r', encoding='utf-8') as f:
@@ -32,7 +31,8 @@ def process_file(input_path):
         
         return output_path
     except Exception as e:
-        return str(e)
+        app.logger.error(f"处理文件时出错: {str(e)}")
+        raise
 
 @app.route('/')
 def index():
@@ -53,7 +53,7 @@ def upload_file():
     try:
         # 保存上传的文件
         filename = secure_filename(file.filename)
-        input_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        input_path = os.path.join(tempfile.gettempdir(), filename)
         file.save(input_path)
         
         # 处理文件
@@ -65,14 +65,22 @@ def upload_file():
                         download_name='processed_' + filename)
     
     except Exception as e:
-        return str(e), 500
+        app.logger.error(f"上传处理时出错: {str(e)}")
+        return f"处理文件时出错: {str(e)}", 500
     finally:
         # 清理临时文件
         try:
-            os.remove(input_path)
-            os.remove(output_path)
+            if os.path.exists(input_path):
+                os.remove(input_path)
+            if os.path.exists(output_path):
+                os.remove(output_path)
         except:
             pass
 
+@app.errorhandler(500)
+def internal_error(error):
+    app.logger.error(f'服务器错误: {error}')
+    return "服务器内部错误，请稍后重试", 500
+
 if __name__ == '__main__':
-    app.run(debug=True, port=5000) 
+    app.run(debug=True, port=5000)
