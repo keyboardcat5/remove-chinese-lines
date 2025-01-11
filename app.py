@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, send_file
+from flask import Flask, render_template, request, send_file, send_from_directory
 import os
 import re
 from werkzeug.utils import secure_filename
@@ -8,6 +8,10 @@ app = Flask(__name__)
 # 使用系统临时目录
 app.config['UPLOAD_FOLDER'] = tempfile.gettempdir()
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 限制文件大小为16MB
+
+@app.route('/favicon.ico')
+def favicon():
+    return '', 204
 
 def has_chinese(text):
     """检查文本是否包含中文字符"""
@@ -36,7 +40,11 @@ def process_file(input_path):
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    try:
+        return render_template('index.html')
+    except Exception as e:
+        app.logger.error(f"渲染模板时出错: {str(e)}")
+        return str(e), 500
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
@@ -83,4 +91,4 @@ def internal_error(error):
     return "服务器内部错误，请稍后重试", 500
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run()
