@@ -1,0 +1,4 @@
+flask==2.3.3
+werkzeug==2.3.7
+waitress==2.1.2  # Windows服务器使用
+gunicorn==21.2.0  # Linux服务器使用 
